@@ -1,12 +1,9 @@
 'use client'
 import React, { useState } from 'react';
 
-interface InputTextProps {
-}
-
 type LetterDict = { [key: string]: number };
 
-const InputText: React.FC<InputTextProps> = ({ }) => {
+const InputText: React.FC = ({ }) => {
     const [text, setText] = useState('');
     const [words, setWords] = useState<string[]>([]);
     const [wordsCode, setWordsCode] = useState<LetterDict>({});
@@ -14,13 +11,13 @@ const InputText: React.FC<InputTextProps> = ({ }) => {
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         event.preventDefault();
         setText(event.target.value);
-        let words = event.target.value.split(' ');
+        const words = event.target.value.split(' ');
 
         setWords(words);
-        let letters = new Set(words.join(''));
+        const letters = new Set(words.join(''));
 
-        let letterDict: LetterDict = wordsCode;
-        let availableNumbers = Array.from({ length: 101 }, (_, i) => i);
+        const letterDict: LetterDict = wordsCode;
+        const availableNumbers = Array.from({ length: 101 }, (_, i) => i);
 
         letters.forEach(letter => {
             const randomIndex = Math.floor(Math.random() * availableNumbers.length);

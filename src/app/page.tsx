@@ -1,4 +1,3 @@
-import Image from "next/image";
 import InputText from "../components/inputText";
 
 export default function Home() {
