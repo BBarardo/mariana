@@ -1,6 +1,6 @@
 import React from 'react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const ToPDF: React.FC = () => {
     const downloadPDF = () => {
