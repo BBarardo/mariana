@@ -8,10 +8,10 @@ const InputText: React.FC = ({ }) => {
     const [words, setWords] = useState<string[]>([]);
     const [wordsCode, setWordsCode] = useState<LetterDict>({});
 
-    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         event.preventDefault();
         setText(event.target.value);
-        const words = event.target.value.split(' ');
+        const words = event.target.value.split('\n').filter(word => word !== '').map(word => word.trim());
 
         setWords(words);
         const letters = new Set(words.join(''));
@@ -74,8 +74,8 @@ const InputText: React.FC = ({ }) => {
 
     return (
         <div className="p-4 flex flex-col items-center">
-            <input
-                type="text"
+            <textarea
+                rows={5}
                 value={text}
                 onChange={handleChange}
                 className="m-5 border border-gray-300 p-2 rounded w-full max-w-lg"
