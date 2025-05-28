@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 
-type Direction = 'horizontal' | 'vertical';
+type Direction = 'horizontal' | 'vertical' | 'diagonal' | 'diagonal-reverse';
 
 interface WordPlacement {
     word: string;
@@ -20,15 +20,32 @@ function generateEmptyGrid(width: number, height: number): string[][] {
 }
 
 function canPlaceWord(grid: string[][], word: string, x: number, y: number, direction: Direction): boolean {
+    // Defensive: check if grid is valid and has at least one row
+    if (!grid.length || !grid[0].length) return false;
     if (direction === 'horizontal') {
-        if (x + word.length > grid[0].length) return false;
+        if (x < 0 || y < 0 || x + word.length > grid[0].length || y >= grid.length) return false;
         for (let i = 0; i < word.length; i++) {
+            if (!grid[y] || grid[y][x + i] === undefined) return false;
             if (grid[y][x + i] && grid[y][x + i] !== word[i]) return false;
         }
-    } else {
-        if (y + word.length > grid.length) return false;
+    } else if (direction === 'vertical') {
+        if (x < 0 || y < 0 || y + word.length > grid.length || x >= grid[0].length) return false;
         for (let i = 0; i < word.length; i++) {
+            if (!grid[y + i] || grid[y + i][x] === undefined) return false;
             if (grid[y + i][x] && grid[y + i][x] !== word[i]) return false;
+        }
+    } else if (direction === 'diagonal') {
+        if (x < 0 || y < 0 || x + word.length > grid[0].length || y + word.length > grid.length) return false;
+        for (let i = 0; i < word.length; i++) {
+            if (!grid[y + i] || grid[y + i][x + i] === undefined) return false;
+            if (grid[y + i][x + i] && grid[y + i][x + i] !== word[i]) return false;
+        }
+    } else {
+        // diagonal-reverse (left-to-right, bottom-to-top)
+        if (x < 0 || y < 0 || x + word.length > grid[0].length || y - word.length + 1 < 0) return false;
+        for (let i = 0; i < word.length; i++) {
+            if (!grid[y - i] || grid[y - i][x + i] === undefined) return false;
+            if (grid[y - i][x + i] && grid[y - i][x + i] !== word[i]) return false;
         }
     }
     return true;
@@ -39,9 +56,18 @@ function placeWord(grid: string[][], word: string, x: number, y: number, directi
         for (let i = 0; i < word.length; i++) {
             grid[y][x + i] = word[i];
         }
-    } else {
+    } else if (direction === 'vertical') {
         for (let i = 0; i < word.length; i++) {
             grid[y + i][x] = word[i];
+        }
+    } else if (direction === 'diagonal') {
+        for (let i = 0; i < word.length; i++) {
+            grid[y + i][x + i] = word[i];
+        }
+    } else {
+        // diagonal-reverse (left-to-right, bottom-to-top)
+        for (let i = 0; i < word.length; i++) {
+            grid[y - i][x + i] = word[i];
         }
     }
 }
@@ -57,7 +83,7 @@ function fillEmptyCells(grid: string[][]): void {
     }
 }
 
-function findIntersections(word: string, placedWords: { word: string, x: number, y: number, direction: Direction }[], grid: string[][]) {
+function findIntersections(word: string, placedWords: { word: string, x: number, y: number, direction: Direction }[], grid: string[][], allowDiagonal: boolean) {
     // Find all possible intersections between the current word and already placed words
     const intersections: Array<{
         wordIdx: number;
@@ -65,20 +91,33 @@ function findIntersections(word: string, placedWords: { word: string, x: number,
         letter: string;
         wordLetterIdx: number;
         placedLetterIdx: number;
+        direction: Direction;
     }> = [];
     for (let placedIdx = 0; placedIdx < placedWords.length; placedIdx++) {
         const placed = placedWords[placedIdx];
         for (let i = 0; i < word.length; i++) {
             for (let j = 0; j < placed.word.length; j++) {
                 if (word[i] === placed.word[j]) {
-                    // Found a common letter between the new word and a placed word
-                    intersections.push({
-                        wordIdx: placedIdx,
-                        placed,
-                        letter: word[i],
-                        wordLetterIdx: i, // index in the new word
-                        placedLetterIdx: j, // index in the placed word
-                    });
+                    if (placed.direction === 'horizontal') {
+                        if (allowDiagonal) {
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal' });
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal-reverse' });
+                        }
+                        intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'vertical' });
+                    } else if (placed.direction === 'vertical') {
+                        if (allowDiagonal) {
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal' });
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal-reverse' });
+                        }
+                        intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'horizontal' });
+                    } else if (allowDiagonal && (placed.direction === 'diagonal' || placed.direction === 'diagonal-reverse')) {
+                        intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'horizontal' });
+                        intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'vertical' });
+                        if (allowDiagonal) {
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal' });
+                            intersections.push({ wordIdx: placedIdx, placed, letter: word[i], wordLetterIdx: i, placedLetterIdx: j, direction: 'diagonal-reverse' });
+                        }
+                    }
                 }
             }
         }
@@ -91,6 +130,8 @@ function canPlaceIntersectingWord(grid: string[][], word: string, x: number, y: 
     for (let i = 0; i < word.length; i++) {
         let xi = x, yi = y;
         if (direction === 'horizontal') xi += i;
+        else if (direction === 'diagonal') { xi += i; yi += i; }
+        else if (direction === 'diagonal-reverse') { xi += i; yi -= i; }
         else yi += i;
         // Out of bounds check
         if (xi < 0 || xi >= grid[0].length || yi < 0 || yi >= grid.length) return false;
@@ -105,12 +146,14 @@ function placeIntersectingWord(grid: string[][], word: string, x: number, y: num
     for (let i = 0; i < word.length; i++) {
         let xi = x, yi = y;
         if (direction === 'horizontal') xi += i;
+        else if (direction === 'diagonal') { xi += i; yi += i; }
+        else if (direction === 'diagonal-reverse') { xi += i; yi -= i; }
         else yi += i;
         grid[yi][xi] = word[i];
     }
 }
 
-function generateWordSearch(width: number, height: number, words: string[]): string[][] {
+function generateWordSearch(width: number, height: number, words: string[], allowDiagonal: boolean): string[][] {
     // Main function to generate the word search grid
     const grid = generateEmptyGrid(width, height);
     // Keep track of placed words and their positions/directions
@@ -120,22 +163,24 @@ function generateWordSearch(width: number, height: number, words: string[]): str
         let attempts = 0;
         // Try to intersect with already placed words (randomly, not always)
         if (placedWords.length > 0 && Math.random() > 0.5) {
-            const intersections = findIntersections(word, placedWords, grid);
+            const intersections = findIntersections(word, placedWords, grid, allowDiagonal);
             // Shuffle intersections for randomness
             for (const intersection of intersections.sort(() => Math.random() - 0.5)) {
-                const { placed: pw, wordLetterIdx, placedLetterIdx } = intersection;
-                // Calculate coordinates so that word[wordLetterIdx] overlaps with pw.word[placedLetterIdx]
-                let x, y, direction: Direction;
-                if (pw.direction === 'horizontal') {
-                    // Place new word vertically, intersecting horizontally placed word
-                    direction = 'vertical';
-                    x = pw.x + placedLetterIdx; // align columns
-                    y = pw.y - wordLetterIdx;   // align rows so intersection matches
+                const { placed: pw, wordLetterIdx, placedLetterIdx, direction } = intersection;
+                let x, y;
+                if (direction === 'horizontal') {
+                    x = pw.x - wordLetterIdx;
+                    y = pw.y + placedLetterIdx;
+                } else if (direction === 'vertical') {
+                    x = pw.x + placedLetterIdx;
+                    y = pw.y - wordLetterIdx;
+                } else if (direction === 'diagonal') {
+                    x = pw.x - wordLetterIdx;
+                    y = pw.y - wordLetterIdx + placedLetterIdx;
                 } else {
-                    // Place new word horizontally, intersecting vertically placed word
-                    direction = 'horizontal';
-                    x = pw.x - wordLetterIdx;   // align columns so intersection matches
-                    y = pw.y + placedLetterIdx; // align rows
+                    // diagonal-reverse (left-to-right, bottom-to-top)
+                    x = pw.x - wordLetterIdx;
+                    y = pw.y + wordLetterIdx - placedLetterIdx;
                 }
                 // Check if this intersection placement is possible
                 if (canPlaceIntersectingWord(grid, word, x, y, direction, wordLetterIdx)) {
@@ -148,12 +193,34 @@ function generateWordSearch(width: number, height: number, words: string[]): str
         }
         // If not placed by intersection, place randomly
         while (!placed && attempts < 100) {
-            const direction: Direction = Math.random() > 0.5 ? 'horizontal' : 'vertical';
-            // Calculate max starting positions to keep word in bounds
-            const maxX = direction === 'horizontal' ? width - word.length : width - 1;
-            const maxY = direction === 'vertical' ? height - word.length : height - 1;
-            const x = Math.floor(Math.random() * (maxX + 1));
-            const y = Math.floor(Math.random() * (maxY + 1));
+            let directions: Direction[] = ['horizontal', 'vertical'];
+            if (allowDiagonal) {
+                directions.push('diagonal', 'diagonal-reverse');
+            }
+            const direction = directions[Math.floor(Math.random() * directions.length)];
+            let maxX, maxY;
+            if (direction === 'horizontal') {
+                maxX = width - word.length;
+                maxY = height - 1;
+            } else if (direction === 'vertical') {
+                maxX = width - 1;
+                maxY = height - word.length;
+            } else if (direction === 'diagonal') {
+                maxX = width - word.length;
+                maxY = height - word.length;
+            } else {
+                // diagonal-reverse (left-to-right, bottom-to-top)
+                maxX = width - word.length;
+                maxY = height - 1;
+            }
+            let x, y;
+            if (direction === 'diagonal-reverse') {
+                x = Math.floor(Math.random() * (maxX + 1));
+                y = Math.floor(Math.random() * (maxY + 1)) + (word.length - 1);
+            } else {
+                x = Math.floor(Math.random() * (maxX + 1));
+                y = Math.floor(Math.random() * (maxY + 1));
+            }
             if (canPlaceWord(grid, word, x, y, direction)) {
                 placeWord(grid, word, x, y, direction);
                 placedWords.push({ word, x, y, direction });
@@ -170,7 +237,8 @@ const WordSearchComponent: React.FC = () => {
     const maxWordLength = getMaxWordLength(WORDS);
     const [width, setWidth] = useState(maxWordLength + 2);
     const [height, setHeight] = useState(maxWordLength + 2);
-    const [grid, setGrid] = useState<string[][]>(() => generateWordSearch(width, height, WORDS));
+    const [allowDiagonal, setAllowDiagonal] = useState(false);
+    const [grid, setGrid] = useState<string[][]>(() => generateWordSearch(width, height, WORDS, false));
 
     const handleWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = Math.max(Number(e.target.value), maxWordLength);
@@ -183,7 +251,7 @@ const WordSearchComponent: React.FC = () => {
     };
 
     const handleGenerate = () => {
-        setGrid(generateWordSearch(width, height, WORDS));
+        setGrid(generateWordSearch(width, height, WORDS, allowDiagonal));
     };
 
     return (
@@ -208,6 +276,16 @@ const WordSearchComponent: React.FC = () => {
                         onChange={handleHeightChange}
                         className="border rounded px-2 py-1 w-20 bg-white dark:bg-gray-800 dark:text-gray-100 border-gray-300 dark:border-gray-600"
                     />
+                </div>
+                <div className="flex items-center h-10 mt-6">
+                    <input
+                        id="diagonal-toggle"
+                        type="checkbox"
+                        checked={allowDiagonal}
+                        onChange={e => setAllowDiagonal(e.target.checked)}
+                        className="mr-2"
+                    />
+                    <label htmlFor="diagonal-toggle" className="text-sm dark:text-gray-200">Allow Diagonal</label>
                 </div>
                 <button
                     onClick={handleGenerate}
